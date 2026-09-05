@@ -339,6 +339,7 @@
       <div class="field">
         <label>Joined Date <span class="tam">சேர்ந்த தேதி</span></label>
         <input id="w_joined" type="date" />
+        <span style="font-size:10px; color:#9AA3AE;">📅 icon-ஐ தட்டி தேதி select பண்ணுங்க (type பண்ணாதீங்க)</span>
       </div>
       <div class="field">
         <label>Phone Number <span class="tam">தொலைபேசி</span></label>
@@ -357,8 +358,7 @@
     <div class="grid">
       <div class="field">
         <label>Worker Name <span class="tam">பெயர்</span></label>
-        <input id="f_name" list="workerNames" placeholder="Worker's name" />
-        <datalist id="workerNames"></datalist>
+        <input id="f_name" readonly placeholder="Tap to select worker" onclick="openWorkerPicker()" style="cursor:pointer;" />
       </div>
       <div class="field">
         <label>Department <span class="tam">துறை</span></label>
@@ -387,10 +387,12 @@
       <div class="field">
         <label>Leave Start Date <span class="tam">தொடக்க நாள்</span></label>
         <input id="f_start" type="date" />
+        <span style="font-size:10px; color:#9AA3AE;">📅 icon-ஐ தட்டி select பண்ணுங்க</span>
       </div>
       <div class="field">
         <label>Rejoined Date <span class="tam">மீண்டும் சேர்ந்த நாள்</span></label>
         <input id="f_rejoin" type="date" />
+        <span style="font-size:10px; color:#9AA3AE;">📅 icon-ஐ தட்டி select பண்ணுங்க</span>
       </div>
       <div class="field readonly">
         <label>Total Leave (auto)</label>
@@ -437,6 +439,22 @@
     </div>
     <div class="modal-stats" id="historyStats"></div>
     <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="workerPickerModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h3>Select Worker</h3>
+        <div class="sub">தொழிலாளியை தேர்ந்தெடுங்க</div>
+      </div>
+      <button class="modal-close" id="closePicker">✕</button>
+    </div>
+    <div style="padding: 14px 20px 6px;">
+      <input class="search" id="pickerSearch" placeholder="Search name or department..." style="width:100%;" />
+    </div>
+    <div class="history-list" id="pickerList" style="max-height: 50vh; overflow-y:auto;"></div>
   </div>
 </div>
 
@@ -579,9 +597,6 @@ async function deleteWorker(id){
 }
 
 function renderWorkers(){
-  const listEl = document.getElementById('workerNames');
-  listEl.innerHTML = workers.map(w => `<option value="${escapeHtml(w.name)}"></option>`).join('');
-
   const wrap = document.getElementById('workerTableWrap');
   if(workers.length === 0){
     wrap.innerHTML = `<div class="empty">No workers added yet.</div>`;
@@ -609,11 +624,61 @@ function renderWorkers(){
   `;
 }
 
-document.getElementById('f_name').addEventListener('input', (e) => {
-  const match = workers.find(w => w.name.toLowerCase() === e.target.value.trim().toLowerCase());
-  if(match && match.dept && !document.getElementById('f_dept').value){
-    document.getElementById('f_dept').value = match.dept;
+function openWorkerPicker(){
+  document.getElementById('pickerSearch').value = '';
+  renderPickerList('');
+  document.getElementById('workerPickerModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('pickerSearch').focus(), 50);
+}
+
+function renderPickerList(query){
+  const q = query.trim().toLowerCase();
+  const matches = workers
+    .filter(w => !q || w.name.toLowerCase().includes(q) || (w.dept || '').toLowerCase().includes(q))
+    .sort((a,b) => a.name.localeCompare(b.name));
+
+  const listEl = document.getElementById('pickerList');
+
+  let html = '';
+  if(matches.length === 0){
+    html += `<div class="history-empty">No workers found.</div>`;
+  } else {
+    html += matches.map(w => `
+      <div class="history-item" style="cursor:pointer;" onclick="pickWorker('${w.id}')">
+        <div class="row1">
+          <span class="range">${escapeHtml(w.name)}</span>
+          ${w.dept ? `<span class="dept-tag">${escapeHtml(w.dept)}</span>` : ''}
+        </div>
+      </div>
+    `).join('');
   }
+  if(q && !workers.some(w => w.name.toLowerCase() === q)){
+    html += `<div class="history-item" style="cursor:pointer; color:var(--navy); font-weight:600;" onclick="pickCustomName()">+ Use "${escapeHtml(query.trim())}" (not in worker list)</div>`;
+  }
+  listEl.innerHTML = html;
+}
+
+function pickWorker(id){
+  const w = workers.find(x => x.id === id);
+  if(!w) return;
+  document.getElementById('f_name').value = w.name;
+  if(w.dept) document.getElementById('f_dept').value = w.dept;
+  document.getElementById('workerPickerModal').classList.add('hidden');
+}
+
+function pickCustomName(){
+  const val = document.getElementById('pickerSearch').value.trim();
+  if(!val) return;
+  document.getElementById('f_name').value = val;
+  document.getElementById('workerPickerModal').classList.add('hidden');
+}
+
+document.getElementById('pickerSearch').addEventListener('input', (e) => renderPickerList(e.target.value));
+document.getElementById('closePicker').addEventListener('click', () => {
+  document.getElementById('workerPickerModal').classList.add('hidden');
+});
+document.getElementById('workerPickerModal').addEventListener('click', (e) => {
+  if(e.target.id === 'workerPickerModal') document.getElementById('workerPickerModal').classList.add('hidden');
 });
 
 function setStatus(msg){
